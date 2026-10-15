@@ -131,7 +131,7 @@
       <div><label for="s-mese">Mese</label><select id="s-mese"></select></div>
       <div><label for="s-anno">Anno</label><select id="s-anno"></select></div>
     </div>
-    <p class="sotto">Correggi le caselle sbagliate toccandole. Lascia vuoto se quel giorno non c'è nulla.</p>
+    <p class="sotto">Correggi le caselle sbagliate toccandole. Le sigle sono riportate come nel foglio; una casella vuota è una giornata normale.</p>
     <datalist id="d-codici"></datalist>
     <div class="lista-giorni" id="l-giorni"></div>
     <div class="azioni fisse">
@@ -150,7 +150,17 @@
 
     <section class="gruppo">
       <h3>Tipi di turno</h3>
-      <p class="sotto">Le sigle usate nel foglio e i loro orari. Servono per il calendario del telefono e per le notifiche.</p>
+      <p class="sotto">Le sigle trovate nei fogli compaiono qui da sole. Nome e orari sono facoltativi: con l'orario, i promemoria arrivano all'ora giusta.</p>
+      <div class="riga-sigla">
+        <span class="codice-vuoto">vuoto</span>
+        <span class="nome-fisso">Giornata normale</span>
+        <span></span><span></span>
+        <div class="orari">
+          <input type="time" id="i-norm-inizio" aria-label="Inizio giornata normale">
+          <input type="time" id="i-norm-fine" aria-label="Fine giornata normale">
+          <span></span>
+        </div>
+      </div>
       <div id="l-legenda"></div>
       <button class="btn testo" id="b-agg-sigla">+ Aggiungi sigla</button>
     </section>

@@ -7,14 +7,11 @@
   const GIORNI = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
   const GIORNI_BREVI = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
 
-  const LEGENDA_BASE = {
-    M: { nome: 'Mattina', inizio: '07:00', fine: '14:00', colore: '#e09b1a' },
-    P: { nome: 'Pomeriggio', inizio: '14:00', fine: '21:00', colore: '#2f7fd8' },
-    N: { nome: 'Notte', inizio: '21:00', fine: '07:00', colore: '#5b45c9' },
-    S: { nome: 'Smonto notte', inizio: '', fine: '', colore: '#8a96a3' },
-    R: { nome: 'Riposo', inizio: '', fine: '', colore: '#2e9c6a' },
-    F: { nome: 'Ferie', inizio: '', fine: '', colore: '#d4547a' },
-  };
+  // Le sigle vengono riportate così come sono nel foglio: nome e orari sono facoltativi,
+  // si aggiungono nelle impostazioni solo se servono (per i promemoria con l'ora giusta).
+  const LEGENDA_BASE = {};
+  const PALETTE = ['#e09b1a', '#2f7fd8', '#5b45c9', '#2e9c6a', '#d4547a', '#0f8a8a', '#a8572d', '#6a7f2a', '#8a4fb5', '#c0392b'];
+  const COLORE_NORMALE = '#b9b2a4';
 
   /* ---------------- memoria locale ---------------- */
   const mem = {
@@ -26,7 +23,7 @@
     utente: mem.get('utente', null),
     turni: mem.get('turni', {}),            // { "2026-11": { "1": "M", ... } }
     legenda: mem.get('legenda', LEGENDA_BASE),
-    opz: Object.assign({ sera: '20:00', prima: 60 }, mem.get('opzioni', {})),
+    opz: Object.assign({ sera: '20:00', prima: 60, normaleInizio: '', normaleFine: '' }, mem.get('opzioni', {})),
     meseVisto: null,
     bozza: null,
   };
@@ -46,9 +43,35 @@
   function oggi() { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
   function piuGiorni(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
 
-  function codiceDel(data) {
+
+  /** Turno di un giorno: null se il mese non è caricato; "giornata normale" se la cella era vuota. */
+  function turnoDel(data) {
     const m = stato.turni[chiaveMese(data.getFullYear(), data.getMonth() + 1)];
-    return m ? m[data.getDate()] || '' : '';
+    if (!m) return null;
+    return m[data.getDate()] ? infoTurno(m[data.getDate()]) : giornataNormale();
+  }
+
+  function giornataNormale() {
+    return { codice: '', nome: 'Giornata normale', inizio: stato.opz.normaleInizio, fine: stato.opz.normaleFine, colore: COLORE_NORMALE, normale: true };
+  }
+
+  function coloreAutomatico(c) {
+    let h = 0;
+    for (const ch of c) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return PALETTE[h % PALETTE.length];
+  }
+
+  /** Primo colore della tavolozza non ancora usato da un'altra sigla. */
+  function coloreLibero() {
+    const usati = new Set(Object.values(stato.legenda).map((t) => (t.colore || '').toLowerCase()));
+    return PALETTE.find((c) => !usati.has(c)) || PALETTE[Object.keys(stato.legenda).length % PALETTE.length];
+  }
+
+  /** Come mostrare un turno: la sigla del foglio, più il nome se l'utente gliene ha dato uno. */
+  function titoloTurno(t) {
+    if (!t) return '';
+    if (t.normale) return t.nome;
+    return t.nome && t.nome !== t.codice ? `${t.codice} · ${t.nome}` : t.codice;
   }
 
   /* ---------------- sigle ---------------- */
@@ -56,14 +79,14 @@
     if (!codice) return null;
     const c = String(codice).toUpperCase().trim();
     const l = stato.legenda[c];
-    if (l) return { codice: c, ...l };
+    if (l) return { codice: c, ...l, nome: l.nome || c, colore: l.colore || coloreAutomatico(c) };
     // orario scritto direttamente: "7-14", "07:00-14:00", "7.30-14"
     const m = c.match(/^(\d{1,2})(?:[:.](\d{2}))?\s*[-–]\s*(\d{1,2})(?:[:.](\d{2}))?$/);
     if (m) {
       const inizio = `${pad(m[1])}:${m[2] || '00'}`, fine = `${pad(m[3])}:${m[4] || '00'}`;
       return { codice: c, nome: `Turno ${inizio}–${fine}`, inizio, fine, colore: '#0f5257' };
     }
-    return { codice: c, nome: c, inizio: '', fine: '', colore: '#7b8794', sconosciuto: true };
+    return { codice: c, nome: c, inizio: '', fine: '', colore: coloreAutomatico(c) };
   }
 
   function orario(t) { return t && t.inizio && t.fine ? `${t.inizio}–${t.fine}` : ''; }
@@ -111,7 +134,7 @@
 
   /* ---------------- home ---------------- */
   function schedaHtml(chi, data) {
-    const t = infoTurno(codiceDel(data));
+    const t = turnoDel(data);
     const el = document.createElement('div');
     if (!t) {
       el.innerHTML = `<span class="chi">${chi}</span><span class="cosa">—</span><span class="quando">Nessun turno caricato</span>`;
@@ -119,8 +142,8 @@
     }
     el.innerHTML = `<span class="chi"></span><span class="cosa"></span><span class="quando"></span>`;
     el.querySelector('.chi').textContent = chi;
-    el.querySelector('.cosa').textContent = t.nome;
-    el.querySelector('.quando').textContent = orario(t) || (t.sconosciuto ? `Sigla "${t.codice}"` : '');
+    el.querySelector('.cosa').textContent = titoloTurno(t);
+    el.querySelector('.quando').textContent = orario(t);
     return { html: el.innerHTML, colore: t.colore };
   }
 
@@ -166,7 +189,9 @@
         const s = document.createElement('span'); s.className = 'sigla'; s.textContent = t.codice;
         s.style.setProperty('--colore', t.colore); b.appendChild(s);
       } else {
-        b.appendChild(document.createElement('span'));
+        const s = document.createElement('span');
+        if (Object.keys(dati).length) { s.className = 'normale'; s.title = 'Giornata normale'; }
+        b.appendChild(s);
       }
       b.addEventListener('click', () => mostraGiorno(new Date(a, m - 1, d)));
       cal.appendChild(b);
@@ -179,18 +204,24 @@
       const s = document.createElement('span');
       s.innerHTML = '<i></i>';
       s.querySelector('i').style.setProperty('--colore', t.colore);
-      s.append(`${c} ${t.nome !== c ? t.nome : ''}${orario(t) ? ' ' + orario(t) : ''}`);
+      s.append(`${titoloTurno(t)}${orario(t) ? ' ' + orario(t) : ''}`);
       leg.appendChild(s);
     });
+    if (Object.keys(dati).length) {
+      const s = document.createElement('span');
+      s.innerHTML = '<i class="vuota"></i>';
+      s.append('vuoto = giornata normale');
+      leg.appendChild(s);
+    }
   }
 
   function mostraGiorno(data) {
-    const t = infoTurno(codiceDel(data));
+    const t = turnoDel(data);
     const box = $('#dettaglio');
     box.innerHTML = '<p class="sotto"></p><p class="cosa"></p><p class="quando"></p><button class="btn largo">Chiudi</button>';
     box.querySelector('.sotto').textContent = `${GIORNI[data.getDay()]} ${data.getDate()} ${MESI[data.getMonth()]} ${data.getFullYear()}`;
-    box.querySelector('.cosa').textContent = t ? t.nome : 'Nessun turno';
-    box.querySelector('.quando').textContent = t ? (orario(t) || (t.sconosciuto ? `Sigla "${t.codice}": puoi darle un nome e un orario nelle impostazioni.` : '')) : '';
+    box.querySelector('.cosa').textContent = t ? titoloTurno(t) : 'Turni non caricati';
+    box.querySelector('.quando').textContent = t ? orario(t) : 'Carica il foglio turni di questo mese.';
     box.querySelector('button').onclick = () => (box.hidden = true);
     box.hidden = false;
   }
@@ -321,7 +352,7 @@
         if (v) b.turni[d] = v; else delete b.turni[d];
         const t = infoTurno(v);
         cella.style.setProperty('--colore', t ? t.colore : 'var(--line)');
-        cella.querySelector('.lab').textContent = t ? (t.sconosciuto ? 'sigla nuova' : t.nome) : '';
+        cella.querySelector('.lab').textContent = t ? (t.nome !== t.codice ? t.nome : '') : 'normale';
       };
       inp.addEventListener('input', aggiorna);
       aggiorna();
@@ -336,14 +367,16 @@
     for (let d = 1; d <= n; d++) if (b.turni[d]) turni[d] = b.turni[d];
     if (!Object.keys(turni).length) { avviso('Non ci sono turni da salvare'); return; }
     stato.turni[chiaveMese(b.anno, b.mese)] = turni;
-    // le sigle nuove vengono aggiunte alla legenda, così si possono configurare
-    const nuove = [];
-    Object.values(turni).forEach((c) => { const t = infoTurno(c); if (t && t.sconosciuto && !stato.legenda[t.codice]) { stato.legenda[t.codice] = { nome: t.codice, inizio: '', fine: '', colore: '#7b8794' }; nuove.push(t.codice); } });
+    // le sigle nuove compaiono nelle impostazioni, dove si può dar loro un nome e un orario
+    Object.values(turni).forEach((c) => {
+      const k = String(c).toUpperCase().trim();
+      if (!stato.legenda[k] && !/^\d{1,2}([:.]\d{2})?\s*[-–]/.test(k)) stato.legenda[k] = { nome: '', inizio: '', fine: '', colore: coloreLibero() };
+    });
     salvaTutto();
     stato.meseVisto = { a: b.anno, m: b.mese };
     stato.bozza = null;
     vai('home');
-    avviso(nuove.length ? `Turni salvati. Sigle nuove: ${nuove.join(', ')} — dagli un nome nelle impostazioni.` : `Turni di ${MESI[b.mese - 1]} salvati`);
+    avviso(`Turni di ${MESI[b.mese - 1]} salvati`);
   };
 
   /* ---------------- impostazioni ---------------- */
@@ -351,6 +384,8 @@
     $('#t-utente').textContent = stato.utente;
     $('#i-sera').value = stato.opz.sera;
     $('#i-prima').value = String(stato.opz.prima);
+    $('#i-norm-inizio').value = stato.opz.normaleInizio || '';
+    $('#i-norm-fine').value = stato.opz.normaleFine || '';
     const box = $('#l-legenda');
     box.innerHTML = '';
     Object.entries(stato.legenda).sort(([a], [b]) => a.localeCompare(b)).forEach(([cod, t]) => {
@@ -367,12 +402,12 @@
           <button class="icona x" aria-label="Elimina sigla">×</button>
         </div>`;
       const [ic, inome, icol] = r.querySelectorAll('input');
-      ic.value = cod; inome.value = t.nome; icol.value = t.colore;
+      ic.value = cod; inome.value = t.nome || ''; inome.placeholder = 'Nome (facoltativo)'; icol.value = t.colore || coloreAutomatico(cod);
       r.querySelector('.inizio').value = t.inizio || '';
       r.querySelector('.fine').value = t.fine || '';
       const salva = () => {
         const nuovo = ic.value.toUpperCase().trim();
-        const dati = { nome: inome.value.trim() || nuovo, inizio: r.querySelector('.inizio').value, fine: r.querySelector('.fine').value, colore: icol.value };
+        const dati = { nome: inome.value.trim(), inizio: r.querySelector('.inizio').value, fine: r.querySelector('.fine').value, colore: icol.value };
         if (!nuovo) return;
         if (nuovo !== cod) { delete stato.legenda[cod]; cod = nuovo; }
         stato.legenda[cod] = dati;
@@ -386,11 +421,13 @@
   $('#b-agg-sigla').onclick = () => {
     let c = 'NUOVA', i = 1;
     while (stato.legenda[c]) c = 'NUOVA' + ++i;
-    stato.legenda[c] = { nome: 'Nuovo turno', inizio: '', fine: '', colore: '#0f5257' };
+    stato.legenda[c] = { nome: '', inizio: '', fine: '', colore: '#0f5257' };
     salvaTutto(); disegnaImpostazioni();
   };
   $('#i-sera').onchange = (e) => { stato.opz.sera = e.target.value || '20:00'; salvaTutto(); };
   $('#i-prima').onchange = (e) => { stato.opz.prima = +e.target.value; salvaTutto(); };
+  $('#i-norm-inizio').onchange = (e) => { stato.opz.normaleInizio = e.target.value; salvaTutto(); };
+  $('#i-norm-fine').onchange = (e) => { stato.opz.normaleFine = e.target.value; salvaTutto(); };
   $('#b-cambia').onclick = () => { $('#i-utente').value = stato.utente || ''; vai('accesso'); };
   $('#b-cancella').onclick = () => {
     if (confirm('Vuoi cancellare tutti i turni salvati su questo dispositivo?')) {
@@ -410,10 +447,10 @@
     let n = 0;
     for (const [km, giorni] of Object.entries(stato.turni)) {
       const [a, m] = km.split('-').map(Number);
-      for (const [g, codice] of Object.entries(giorni)) {
-        const data = new Date(a, m - 1, +g);
+      for (let g = 1; g <= giorniNelMese(a, m); g++) {
+        const data = new Date(a, m - 1, g);
         if (data < da) continue; // i turni passati non servono
-        const t = infoTurno(codice);
+        const t = turnoDel(data); // le celle vuote diventano "Giornata normale"
         if (!t) continue;
         const uid = `turno-${ymd(data)}-${(stato.utente || '').toLowerCase()}@i-miei-turni`;
         righe.push('BEGIN:VEVENT', `UID:${uid}`, `DTSTAMP:${stamp}`);
@@ -426,15 +463,15 @@
           righe.push(`DTSTART;VALUE=DATE:${ymd(data)}`, `DTEND;VALUE=DATE:${ymd(piuGiorni(data, 1))}`, 'TRANSP:TRANSPARENT');
           inizioMin = 0;
         }
-        righe.push(`SUMMARY:${esc(`${t.nome}${t.nome !== t.codice ? ` (${t.codice})` : ''}`)}`);
-        righe.push(`DESCRIPTION:${esc(`Turno ${t.codice}${orario(t) ? ' ' + orario(t) : ''}`)}`);
+        righe.push(`SUMMARY:${esc(t.normale ? 'Giornata normale' : `Turno ${titoloTurno(t)}`)}`);
+        righe.push(`DESCRIPTION:${esc(`${titoloTurno(t)}${orario(t) ? ' ' + orario(t) : ''}`)}`);
         // avviso la sera prima: "Domani: ..."
         const sera = minuti(stato.opz.sera || '20:00');
         const anticipo = inizioMin + (24 * 60 - sera);
-        righe.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${esc(`Domani: ${t.nome}${orario(t) ? ' ' + orario(t) : ''}`)}`, `TRIGGER:-PT${anticipo}M`, 'END:VALARM');
+        righe.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${esc(`Domani: ${titoloTurno(t)}${orario(t) ? ' ' + orario(t) : ''}`)}`, `TRIGGER:-PT${anticipo}M`, 'END:VALARM');
         // avviso poco prima dell'inizio
         if (stato.opz.prima > 0 && t.inizio) {
-          righe.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${esc(`Tra poco: ${t.nome} ${orario(t)}`)}`, `TRIGGER:-PT${stato.opz.prima}M`, 'END:VALARM');
+          righe.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${esc(`Tra poco: ${titoloTurno(t)} ${orario(t)}`)}`, `TRIGGER:-PT${stato.opz.prima}M`, 'END:VALARM');
         }
         righe.push('END:VEVENT');
         n++;
@@ -465,9 +502,9 @@
   /* ---------------- notifiche ---------------- */
   function testoNotifica() {
     const o = oggi();
-    const t1 = infoTurno(codiceDel(o)), t2 = infoTurno(codiceDel(piuGiorni(o, 1)));
+    const t1 = turnoDel(o), t2 = turnoDel(piuGiorni(o, 1));
     if (!t1 && !t2) return null;
-    const desc = (t) => (t ? `${t.nome}${orario(t) ? ' ' + orario(t) : ''}` : 'nessun turno');
+    const desc = (t) => (t ? `${titoloTurno(t)}${orario(t) ? ' ' + orario(t) : ''}` : 'turni non caricati');
     return { titolo: `Oggi: ${desc(t1)}`, corpo: `Domani: ${desc(t2)}` };
   }
 
@@ -489,7 +526,7 @@
     try {
       if (!('caches' in window)) return;
       const c = await caches.open('turni-dati');
-      await c.put('dati.json', new Response(JSON.stringify({ turni: stato.turni, legenda: stato.legenda }), { headers: { 'Content-Type': 'application/json' } }));
+      await c.put('dati.json', new Response(JSON.stringify({ turni: stato.turni, legenda: stato.legenda, opz: stato.opz }), { headers: { 'Content-Type': 'application/json' } }));
     } catch { /* ignora */ }
   }
 

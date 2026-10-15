@@ -1,5 +1,5 @@
 /* Service worker: fa funzionare l'app anche senza rete e gestisce le notifiche. */
-const VERSIONE = 'turni-v1';
+const VERSIONE = 'turni-v2';
 const FILE_APP = ['./', 'index.html', 'styles.css', 'app.js', 'parser.js', 'lettura.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -44,17 +44,19 @@ async function notificaGiornaliera() {
   const c = await caches.open('turni-dati');
   const r = await c.match('dati.json');
   if (!r) return;
-  const { turni, legenda } = await r.json();
+  const { turni, legenda, opz = {} } = await r.json();
   const oggi = new Date();
   const chiave = `${oggi.getFullYear()}${pad(oggi.getMonth() + 1)}${pad(oggi.getDate())}`;
   const gia = await c.match('ultima-notifica');
   if (gia && (await gia.text()) === chiave) return;
   const desc = (d) => {
-    const cod = (turni[`${d.getFullYear()}-${pad(d.getMonth() + 1)}`] || {})[d.getDate()];
-    if (!cod) return 'nessun turno';
-    const t = legenda[cod];
-    if (!t) return cod;
-    return t.inizio && t.fine ? `${t.nome} ${t.inizio}–${t.fine}` : t.nome;
+    const mese = turni[`${d.getFullYear()}-${pad(d.getMonth() + 1)}`];
+    if (!mese) return 'turni non caricati';
+    const cod = mese[d.getDate()];
+    if (!cod) return 'Giornata normale' + (opz.normaleInizio && opz.normaleFine ? ` ${opz.normaleInizio}–${opz.normaleFine}` : '');
+    const t = legenda[cod] || {};
+    const titolo = t.nome && t.nome !== cod ? `${cod} · ${t.nome}` : cod;
+    return t.inizio && t.fine ? `${titolo} ${t.inizio}–${t.fine}` : titolo;
   };
   const domani = new Date(oggi.getFullYear(), oggi.getMonth(), oggi.getDate() + 1);
   await self.registration.showNotification(`Oggi: ${desc(oggi)}`, { body: `Domani: ${desc(domani)}`, icon: 'icons/icon-192.png', tag: 'turno-oggi' });
