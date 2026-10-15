@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>I miei turni</title>
+  <meta name="description" content="Il tuo calendario dei turni, letto dal foglio Excel, PDF o da una foto.">
+  <meta name="theme-color" content="#0f5257">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Turni">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- ACCESSO -->
+  <main id="v-accesso" class="vista" hidden>
+    <div class="accesso">
+      <img src="icons/icon-192.png" alt="" class="logo">
+      <h1>I miei turni</h1>
+      <p class="sotto">Scrivi il tuo nome come <b>Nome.Cognome</b>: l'app cercherà i tuoi turni nel foglio.</p>
+      <form id="f-accesso" autocomplete="off">
+        <label for="i-utente">Nome utente</label>
+        <input id="i-utente" placeholder="Mario.Rossi" autocapitalize="words" spellcheck="false" required>
+        <p id="e-accesso" class="errore" hidden></p>
+        <button class="btn primario largo" type="submit">Entra</button>
+      </form>
+      <p class="nota">I tuoi turni restano solo su questo dispositivo.</p>
+    </div>
+  </main>
+
+  <!-- HOME -->
+  <main id="v-home" class="vista" hidden>
+    <header class="barra">
+      <div>
+        <p class="saluto" id="t-saluto"></p>
+        <p class="data-oggi" id="t-data"></p>
+      </div>
+      <button class="icona" id="b-impostazioni" aria-label="Impostazioni">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.4 2.9a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1L11 21h4l.4-2.9a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>
+      </button>
+    </header>
+
+    <section class="schede">
+      <article class="scheda" id="c-oggi"></article>
+      <article class="scheda secondaria" id="c-domani"></article>
+    </section>
+
+    <section class="calendario">
+      <div class="cal-testa">
+        <button class="icona" id="b-prec" aria-label="Mese precedente">‹</button>
+        <h2 id="t-mese"></h2>
+        <button class="icona" id="b-succ" aria-label="Mese successivo">›</button>
+      </div>
+      <div class="cal-giorni"><span>L</span><span>M</span><span>M</span><span>G</span><span>V</span><span>S</span><span>D</span></div>
+      <div class="cal-griglia" id="cal"></div>
+      <p class="vuoto" id="t-vuoto" hidden>Nessun turno per questo mese. Carica il foglio turni.</p>
+      <div class="legenda" id="legenda"></div>
+    </section>
+
+    <section class="azioni">
+      <button class="btn primario largo" id="b-carica">Carica turni</button>
+      <button class="btn largo" id="b-calendario">Aggiungi al calendario del telefono</button>
+      <button class="btn testo largo" id="b-notifiche" hidden>Attiva le notifiche</button>
+    </section>
+
+    <div class="dettaglio" id="dettaglio" hidden></div>
+  </main>
+
+  <!-- CARICA -->
+  <main id="v-carica" class="vista" hidden>
+    <header class="barra">
+      <button class="icona" data-vai="home" aria-label="Indietro">‹</button>
+      <h2>Carica turni</h2>
+      <span class="spazio"></span>
+    </header>
+    <p class="sotto">Scegli come hai ricevuto il foglio turni. Il file viene letto solo su questo dispositivo.</p>
+    <div class="fonti">
+      <label class="fonte">
+        <input type="file" id="i-excel" accept=".xlsx,.xlsm,.xls,.ods,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden>
+        <span class="f-icona excel">XLS</span>
+        <span><b>File Excel</b><small>.xlsx, .xls, .csv</small></span>
+      </label>
+      <label class="fonte">
+        <input type="file" id="i-pdf" accept="application/pdf,.pdf" hidden>
+        <span class="f-icona pdf">PDF</span>
+        <span><b>File PDF</b><small>anche scansionato</small></span>
+      </label>
+      <label class="fonte">
+        <input type="file" id="i-foto-scatta" accept="image/*" capture="environment" hidden>
+        <span class="f-icona foto">📷</span>
+        <span><b>Scatta una foto</b><small>al foglio appeso o sullo schermo</small></span>
+      </label>
+      <label class="fonte">
+        <input type="file" id="i-foto-galleria" accept="image/*" hidden>
+        <span class="f-icona foto">🖼️</span>
+        <span><b>Foto dalla galleria</b><small>uno screenshot o una foto già fatta</small></span>
+      </label>
+    </div>
+    <div class="consigli">
+      <b>Per una foto ben leggibile</b>
+      <ul>
+        <li>inquadra tutta la tabella, dritta e ben illuminata;</li>
+        <li>avvicinati il più possibile, senza tagliare i nomi;</li>
+        <li>evita ombre e riflessi.</li>
+      </ul>
+    </div>
+    <div class="attesa" id="attesa" hidden>
+      <div class="rotella"></div>
+      <p id="t-attesa">Sto leggendo…</p>
+      <div class="barra-prog"><div id="prog"></div></div>
+    </div>
+    <p class="errore" id="e-carica" hidden></p>
+  </main>
+
+  <!-- CONTROLLO -->
+  <main id="v-controllo" class="vista" hidden>
+    <header class="barra">
+      <button class="icona" data-vai="carica" aria-label="Indietro">‹</button>
+      <h2>Controlla i turni</h2>
+      <span class="spazio"></span>
+    </header>
+    <div class="avviso" id="a-controllo" hidden></div>
+    <div class="campo">
+      <label for="s-persona">Riga del foglio</label>
+      <select id="s-persona"></select>
+    </div>
+    <div class="campo riga">
+      <div><label for="s-mese">Mese</label><select id="s-mese"></select></div>
+      <div><label for="s-anno">Anno</label><select id="s-anno"></select></div>
+    </div>
+    <p class="sotto">Correggi le caselle sbagliate toccandole. Lascia vuoto se quel giorno non c'è nulla.</p>
+    <datalist id="d-codici"></datalist>
+    <div class="lista-giorni" id="l-giorni"></div>
+    <div class="azioni fisse">
+      <button class="btn largo" data-vai="carica">Annulla</button>
+      <button class="btn primario largo" id="b-salva">Salva i turni</button>
+    </div>
+  </main>
+
+  <!-- IMPOSTAZIONI -->
+  <main id="v-impostazioni" class="vista" hidden>
+    <header class="barra">
+      <button class="icona" data-vai="home" aria-label="Indietro">‹</button>
+      <h2>Impostazioni</h2>
+      <span class="spazio"></span>
+    </header>
+
+    <section class="gruppo">
+      <h3>Tipi di turno</h3>
+      <p class="sotto">Le sigle usate nel foglio e i loro orari. Servono per il calendario del telefono e per le notifiche.</p>
+      <div id="l-legenda"></div>
+      <button class="btn testo" id="b-agg-sigla">+ Aggiungi sigla</button>
+    </section>
+
+    <section class="gruppo">
+      <h3>Promemoria</h3>
+      <div class="campo riga">
+        <div>
+          <label for="i-sera">Avviso del turno di domani alle</label>
+          <input type="time" id="i-sera">
+        </div>
+        <div>
+          <label for="i-prima">Avviso prima del turno</label>
+          <select id="i-prima">
+            <option value="0">Nessuno</option>
+            <option value="30">30 minuti prima</option>
+            <option value="60">1 ora prima</option>
+            <option value="90">1 ora e mezza prima</option>
+            <option value="120">2 ore prima</option>
+          </select>
+        </div>
+      </div>
+      <p class="sotto">Valgono per i turni che aggiungi al calendario del telefono.</p>
+    </section>
+
+    <section class="gruppo">
+      <h3>Account</h3>
+      <p>Nome utente: <b id="t-utente"></b></p>
+      <button class="btn" id="b-cambia">Cambia nome utente</button>
+      <button class="btn pericolo" id="b-cancella">Cancella tutti i turni salvati</button>
+    </section>
+    <p class="nota">I turni sono salvati solo su questo dispositivo. Nessun file viene inviato a server esterni.</p>
+  </main>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="parser.js"></script>
+  <script src="lettura.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
